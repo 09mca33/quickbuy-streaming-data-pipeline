@@ -1,0 +1,434 @@
+# QuickBuy Project Setup Checklist
+
+Complete step-by-step checklist to get your project up and running.
+
+## ✅ Phase 1: Local Environment Setup (15 minutes)
+
+### 1.1 Install Required Tools
+
+- [ ] **Install Azure CLI**
+  ```bash
+  # Verify installation
+  az --version
+  # Should show version 2.50.0 or higher
+  ```
+
+- [ ] **Install Terraform**
+  ```bash
+  # Verify installation
+  terraform version
+  # Should show Terraform v1.5.0 or higher
+  ```
+
+- [ ] **Install Python 3.9+**
+  ```bash
+  # Verify installation
+  python3 --version
+  # Should show Python 3.9.x or higher
+  ```
+
+- [ ] **Install Git**
+  ```bash
+  # Verify installation
+  git --version
+  ```
+
+- [ ] **Install VS Code** (or your preferred IDE)
+  - Extensions: Python, Terraform, Azure Account
+
+### 1.2 Configure Azure Access
+
+- [ ] **Login to Azure CLI**
+  ```bash
+  az login
+  ```
+
+- [ ] **Set correct subscription**
+  ```bash
+  # List subscriptions
+  az account list --output table
+  
+  # Set active subscription
+  az account set --subscription "Your Subscription Name"
+  
+  # Verify
+  az account show
+  ```
+
+- [ ] **Check your Azure credits/budget**
+  - Visit: https://portal.azure.com
+  - Check Cost Management + Billing
+
+### 1.3 Create GitHub Repository
+
+- [ ] **Create new repository**
+  - Name: `quickbuy-streaming-data-pipeline`
+  - Description: "End-to-end real-time data pipeline using Azure Databricks, Event Hubs, and Delta Lake"
+  - Visibility: Public (for portfolio)
+  - Initialize with README: No (we'll create it)
+
+- [ ] **Clone repository locally**
+  ```bash
+  git clone https://github.com/yourusername/quickbuy-streaming-data-pipeline.git
+  cd quickbuy-streaming-data-pipeline
+  ```
+
+## ✅ Phase 2: Project Structure Setup (10 minutes)
+
+### 2.1 Create Folder Structure
+
+- [ ] **Create all directories**
+  ```bash
+  # Main directories
+  mkdir -p azure/terraform/{modules/{storage,eventhubs,keyvault,databricks,monitoring,sql},scripts}
+  mkdir -p data_generator
+  mkdir -p databricks/{setup,bronze,silver,gold,quality,utilities,workflows}
+  mkdir -p tests/{unit,integration,fixtures}
+  mkdir -p monitoring/{dashboards,alerts,logs}
+  mkdir -p docs/images
+  mkdir -p config
+  mkdir -p notebooks
+  mkdir -p sql
+  mkdir -p ci_cd/.github/workflows
+  ```
+
+### 2.2 Add Essential Files
+
+- [ ] **Create .gitignore**
+  ```bash
+  cat > .gitignore << 'EOF'
+  # Python
+  __pycache__/
+  *.py[cod]
+  *$py.class
+  venv/
+  env/
+  
+  # Terraform
+  *.tfstate
+  *.tfstate.backup
+  .terraform/
+  terraform.tfvars
+  *.auto.tfvars
+  
+  # Secrets
+  *.env
+  secrets/
+  *.pem
+  *.key
+  
+  # Data
+  data/
+  checkpoints/
+  *.parquet
+  *.delta
+  
+  # IDE
+  .vscode/
+  .idea/
+  *.swp
+  
+  # Azure
+  *.log
+  .databricks/
+  EOF
+  ```
+
+- [ ] **Create README.md (basic)**
+  ```bash
+  cat > README.md << 'EOF'
+  # QuickBuy Streaming Data Pipeline
+  
+  Real-time e-commerce analytics pipeline using Azure Databricks, Event Hubs, and Delta Lake.
+  
+  ## Status: In Development
+  
+  ## Tech Stack
+  - Azure Databricks
+  - Azure Event Hubs
+  - Delta Lake
+  - PySpark
+  - Terraform
+  
+  ## Documentation
+  Coming soon...
+  EOF
+  ```
+
+- [ ] **Initial commit**
+  ```bash
+  git add .
+  git commit -m "Initial project structure"
+  git push origin main
+  ```
+
+## ✅ Phase 3: Terraform Setup (20 minutes)
+
+### 3.1 Add Terraform Files
+
+- [ ] **Copy all Terraform modules from artifacts**
+  - Copy `main.tf` to `azure/terraform/`
+  - Copy `variables.tf` to `azure/terraform/`
+  - Copy `terraform.tfvars` to `azure/terraform/`
+  - Copy each module to `azure/terraform/modules/`
+  - Copy `deploy.sh` to `azure/terraform/scripts/`
+
+- [ ] **Update terraform.tfvars**
+  ```hcl
+  github_username = "your-actual-github-username"
+  sql_admin_password = "YourStrongP@ssw0rd123!"  # Change this!
+  ```
+
+- [ ] **Make deploy script executable**
+  ```bash
+  chmod +x azure/terraform/scripts/deploy.sh
+  ```
+
+### 3.2 Validate Terraform Configuration
+
+- [ ] **Navigate to Terraform directory**
+  ```bash
+  cd azure/terraform
+  ```
+
+- [ ] **Initialize Terraform**
+  ```bash
+  terraform init
+  ```
+  Expected output: "Terraform has been successfully initialized!"
+
+- [ ] **Validate configuration**
+  ```bash
+  terraform validate
+  ```
+  Expected output: "Success! The configuration is valid."
+
+- [ ] **Format code**
+  ```bash
+  terraform fmt -recursive
+  ```
+
+## ✅ Phase 4: Deploy Azure Infrastructure (15 minutes)
+
+### 4.1 Pre-Deployment
+
+- [ ] **Review what will be created**
+  ```bash
+  terraform plan
+  ```
+  - Review the list of resources
+  - Check estimated costs
+  - Verify naming conventions
+
+- [ ] **Take a screenshot of the plan**
+  - Keep for documentation
+
+### 4.2 Deploy Infrastructure
+
+- [ ] **Run deployment script**
+  ```bash
+  ./scripts/deploy.sh
+  ```
+  OR
+  ```bash
+  terraform apply
+  ```
+
+- [ ] **Confirm deployment**
+  - Type `yes` when prompted
+  - Wait 10-15 minutes for completion
+
+- [ ] **Verify deployment success**
+  ```bash
+  terraform output
+  ```
+
+### 4.3 Post-Deployment Verification
+
+- [ ] **Save deployment outputs**
+  ```bash
+  terraform output -json > ../../deployment-outputs.json
+  ```
+
+- [ ] **Verify in Azure Portal**
+  - Go to: https://portal.azure.com
+  - Find resource group: `rg-quickbuy-dev-cin`
+  - Verify all resources are created
+
+- [ ] **Test access to Databricks**
+  ```bash
+  # Get URL
+  terraform output -raw databricks_workspace_url
+  
+  # Open in browser and verify you can access it
+  ```
+
+- [ ] **Verify Event Hubs**
+  ```bash
+  EVENTHUBS_NS=$(terraform output -raw eventhubs_namespace_name)
+  RG=$(terraform output -raw resource_group_name)
+  
+  az eventhubs eventhub list --namespace-name $EVENTHUBS_NS --resource-group $RG
+  ```
+
+- [ ] **Verify Storage Account**
+  ```bash
+  STORAGE=$(terraform output -raw storage_account_name)
+  
+  az storage container list --account-name $STORAGE --auth-mode login
+  ```
+
+- [ ] **Verify Key Vault**
+  ```bash
+  KEY_VAULT=$(terraform output -raw key_vault_name)
+  
+  az keyvault secret list --vault-name $KEY_VAULT
+  ```
+
+## ✅ Phase 5: Data Generator Setup (30 minutes)
+
+### 5.1 Create Data Generator
+
+- [ ] **Copy data generator code from artifacts**
+  - Save to `data_generator/ecommerce_generator.py`
+
+- [ ] **Create requirements.txt**
+  ```bash
+  cat > data_generator/requirements.txt << 'EOF'
+  azure-eventhub==5.11.4
+  azure-identity==1.13.0
+  faker==19.6.2
+  python-dotenv==1.0.0
+  EOF
+  ```
+
+- [ ] **Create virtual environment**
+  ```bash
+  cd data_generator
+  python3 -m venv venv
+  source venv/bin/activate  # On Windows: venv\Scripts\activate
+  ```
+
+- [ ] **Install dependencies**
+  ```bash
+  pip install -r requirements.txt
+  ```
+
+### 5.2 Create Event Producer
+
+- [ ] **Create event_producer.py**
+  ```python
+  # We'll create this in the next phase
+  # This will send events to Azure Event Hubs
+  ```
+
+- [ ] **Create .env file**
+  ```bash
+  # Get connection strings from Key Vault
+  cd ../azure/terraform
+  KEY_VAULT=$(terraform output -raw key_vault_name)
+  
+  # Get secrets
+  ORDERS_CONN=$(az keyvault secret show --vault-name $KEY_VAULT --name "eventhub-orders-connection-string" --query value -o tsv)
+  CLICKSTREAM_CONN=$(az keyvault secret show --vault-name $KEY_VAULT --name "eventhub-clickstream-connection-string" --query value -o tsv)
+  
+  # Save to .env
+  cd ../../data_generator
+  cat > .env << EOF
+  EVENTHUB_ORDERS_CONNECTION_STRING="$ORDERS_CONN"
+  EVENTHUB_CLICKSTREAM_CONNECTION_STRING="$CLICKSTREAM_CONN"
+  EOF
+  ```
+
+## ✅ Phase 6: Databricks Configuration (Pending)
+
+- [ ] Access Databricks workspace
+- [ ] Create compute clusters
+- [ ] Set up Unity Catalog
+- [ ] Import notebooks (we'll create these)
+- [ ] Configure access to storage
+
+## ✅ Phase 7: Documentation (Ongoing)
+
+### 7.1 Update README
+
+- [ ] Add architecture diagram
+- [ ] Add setup instructions
+- [ ] Add usage examples
+- [ ] Add screenshots
+
+### 7.2 Create Additional Docs
+
+- [ ] SETUP.md (detailed setup guide)
+- [ ] ARCHITECTURE.md (architecture explanation)
+- [ ] Design decisions document
+- [ ] Performance benchmarks (after completion)
+
+## ✅ Phase 8: Git Management
+
+### 8.1 Commit All Changes
+
+- [ ] **Stage and commit**
+  ```bash
+  git add .
+  git commit -m "Add Terraform infrastructure and data generator"
+  git push origin main
+  ```
+
+### 8.2 Create Development Branch
+
+- [ ] **Create feature branch**
+  ```bash
+  git checkout -b feature/bronze-layer
+  ```
+
+## 📊 Current Status Tracker
+
+| Phase | Status | Time Spent | Notes |
+|-------|--------|------------|-------|
+| 1. Local Setup | ⏳ Pending | - | |
+| 2. Project Structure | ⏳ Pending | - | |
+| 3. Terraform Setup | ⏳ Pending | - | |
+| 4. Azure Deployment | ⏳ Pending | - | |
+| 5. Data Generator | ⏳ Pending | - | |
+| 6. Databricks Config | ⏳ Pending | - | |
+| 7. Documentation | ⏳ Pending | - | |
+
+**Legend:**
+- ⏳ Pending
+- 🚧 In Progress
+- ✅ Complete
+- ❌ Blocked
+
+## 💡 Tips
+
+1. **Save costs**: Stop Databricks clusters when not in use
+2. **Use Azure free credits**: Great for initial development
+3. **Take screenshots**: Document your progress for portfolio
+4. **Commit frequently**: Small, focused commits are better
+5. **Test incrementally**: Don't wait until everything is built
+
+## 🆘 Getting Help
+
+If you encounter issues:
+1. Check the Terraform deployment guide
+2. Review Azure Portal for error messages
+3. Check logs in Log Analytics workspace
+4. Verify your Azure permissions
+5. Ensure all prerequisites are met
+
+## 📝 Notes Section
+
+Use this space to track your progress:
+
+```
+Date: ____________
+Phase completed: ____________
+Issues encountered: ____________
+Time taken: ____________
+Next steps: ____________
+```
+
+---
+
+**Remember**: This is a learning project. Take your time, document everything, and don't hesitate to experiment!
