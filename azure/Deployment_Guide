@@ -1,0 +1,851 @@
+# QuickBuy Terraform Deployment Guide
+
+Complete guide to deploy Azure infrastructure for the QuickBuy streaming data pipeline.
+
+## 📋 Prerequisites
+
+### Required Tools
+- **Azure CLI** (version 2.50+)
+  ```bash
+  # Install Azure CLI
+  # macOS
+  brew install azure-cli
+  
+  # Windows
+  # Download from: https://aka.ms/installazurecliwindows
+  
+  # Linux
+  curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+  ```
+
+- **Terraform** (version 1.5+)
+  ```bash
+  # macOS
+  brew tap hashicorp/tap
+  brew install hashicorp/tap/terraform
+  
+  # Windows (using Chocolatey)
+  choco install terraform
+  
+  # Linux
+  wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+  sudo apt install terraform
+  ```
+
+- **Git**
+  ```bash
+  # Verify installation
+  git --version
+  ```
+
+### Azure Account
+- Active Azure subscription
+- Contributor or Owner role
+- Free tier credits work for initial setup
+
+## 📁 Project Structure
+
+```
+quickbuy-streaming-data-pipeline/
+├── azure/
+│   └── terraform/
+│       ├── main.tf                 # Main configuration
+│       ├── variables.tf            # Variable definitions
+│       ├── terraform.tfvars        # Variable values (DO NOT COMMIT)
+│       ├── outputs.tf              # Output definitions
+│       ├── modules/
+│       │   ├── storage/
+│       │   │   ├── main.tf
+│       │   │   └── variables.tf
+│       │   ├── eventhubs/
+│       │   │   ├── main.tf
+│       │   │   └── variables.tf
+│       │   ├── keyvault/
+│       │   │   ├── main.tf
+│       │   │   └── variables.tf
+│       │   ├── databricks/
+│       │   │   ├── main.tf
+│       │   │   └── variables.tf
+│       │   ├── monitoring/
+│       │   │   ├── main.tf
+│       │   │   └── variables.tf
+│       │   └── sql/
+│       │       ├── main.tf
+│       │       └── variables.tf
+│       └── scripts/
+│           └── deploy.sh
+```
+
+## 🚀 Quick Start Deployment
+
+### Step 1: Clone Repository
+```bash
+git clone https://github.com/yourusername/quickbuy-streaming-data-pipeline.git
+cd quickbuy-streaming-data-pipeline/azure/terraform
+```
+
+### Step 2: Login to Azure
+```bash
+az login
+
+# Set your subscription (if you have multiple)
+az account set --subscription "Your Subscription Name"
+
+# Verify
+az account show
+```
+
+### Step 3: Configure Variables
+```bash
+# Copy the example file
+cp terraform.tfvars.example terraform.tfvars
+
+# Edit with your values
+nano terraform.tfvars  # or use your preferred editor
+```
+
+**Important variables to update:**
+```hcl
+project_name    = "quickbuy"
+environment     = "dev"
+github_username = "your-github-username"  # Update this!
+
+# Optional: Enable SQL Database
+create_sql_database = true
+sql_admin_password  = "YourStrongPassword123!"  # Change this!
+```
+
+### Step 4: Initialize Terraform
+```bash
+terraform init
+```
+
+This will:
+- Download required providers
+- Initialize backend
+- Prepare modules
+
+### Step 5: Plan Deployment
+```bash
+terraform plan
+```
+
+Review the plan carefully. You should see approximately **30-40 resources** to be created.
+
+### Step 6: Deploy Infrastructure
+```bash
+# Using the automated script (recommended)
+chmod +x scripts/deploy.sh
+./scripts/deploy.sh
+
+# OR manually
+terraform apply
+```
+
+Enter `yes` when prompted to confirm deployment.
+
+**Deployment time:** Approximately 10-15 minutes
+
+## 📊 What Gets Deployed
+
+### Core Resources
+| Resource | Name Pattern | Purpose |
+|----------|-------------|---------|
+| Resource Group | `rg-quickbuy-dev-cin` | Container for all resources |
+| Storage Account | `stquickbuydevacin` | ADLS Gen2 for data lake |
+| Databricks Workspace | `dbw-quickbuy-dev-cin` | Data processing platform |
+| Event Hubs Namespace | `evhns-quickbuy-dev-cin` | Streaming data ingestion |
+| Key Vault | `kv-quickbuy-dev-xxxx` | Secrets management |
+| Log Analytics | `log-quickbuy-dev-cin` | Monitoring and logging |
+
+### Event Hubs
+- **orders** - Order transaction events (4 partitions)
+- **clickstream** - User behavior events (8 partitions)
+- **products** - Product catalog updates (2 partitions)
+
+### Storage Containers
+- `bronze-layer` - Raw ingested data
+- `silver-layer` - Cleaned and validated data
+- `gold-layer` - Aggregated business metrics
+- `checkpoints` - Streaming checkpoints
+- `configs` - Configuration files
+- `logs` - Application logs
+- `archive` - Historical archives
+- `temp` - Temporary processing
+
+## 🔐 Access Deployed Resources
+
+### Get Deployment Outputs
+```bash
+# View all outputs
+terraform output
+
+# Get specific values
+terraform output storage_account_name
+terraform output databricks_workspace_url
+terraform output eventhubs_namespace_name
+
+# Get sensitive outputs
+terraform output -raw storage_account_key
+```
+
+### Access Databricks
+```bash
+# Get Databricks URL
+DATABRICKS_URL=$(terraform output -raw databricks_workspace_url)
+echo $DATABRICKS_URL
+
+# Open in browser
+open $DATABRICKS_URL  # macOS
+start $DATABRICKS_URL  # Windows
+xdg-open $DATABRICKS_URL  # Linux
+```
+
+### Retrieve Secrets from Key Vault
+```bash
+# Get Key Vault name
+KEY_VAULT=$(terraform output -raw key_vault_name)
+
+# List all secrets
+az keyvault secret list --vault-name $KEY_VAULT
+
+# Get a specific secret
+az keyvault secret show --vault-name $KEY_VAULT --name "eventhub-orders-connection-string" --query value -o tsv
+```
+
+## 💰 Cost Estimation
+
+### Development Environment (Monthly)
+| Service | Configuration | Estimated Cost (INR) |
+|---------|---------------|---------------------|
+| Databricks Compute | 2-4 workers, 8 hours/day | ₹8,000 - ₹12,000 |
+| Storage Account | 100 GB, LRS | ₹500 - ₹800 |
+| Event Hubs | Standard, 1 TU | ₹1,500 - ₹2,500 |
+| Key Vault | Standard | ₹100 - ₹200 |
+| Log Analytics | 5 GB/month | ₹500 - ₹800 |
+| SQL Database (optional) | Basic tier | ₹400 - ₹500 |
+| **Total** | | **₹11,000 - ₹17,000** |
+
+### 💡 Cost Optimization Tips
+1. **Stop Databricks clusters** when not in use
+2. **Use Azure Free Tier** for initial testing
+3. **Enable autoscaling** for Databricks
+4. **Set up cost alerts** in Azure Portal
+5. **Delete resources** after demonstration
+
+## 🧪 Verify Deployment
+
+### Test Storage Account
+```bash
+STORAGE_ACCOUNT=$(terraform output -raw storage_account_name)
+
+# List containers
+az storage container list --account-name $STORAGE_ACCOUNT --auth-mode login
+
+# Upload a test file
+echo "Test file" > test.txt
+az storage blob upload \
+  --account-name $STORAGE_ACCOUNT \
+  --container-name bronze-layer \
+  --name test/test.txt \
+  --file test.txt \
+  --auth-mode login
+```
+
+### Test Event Hubs
+```bash
+EVENTHUBS_NS=$(terraform output -raw eventhubs_namespace_name)
+
+# List Event Hubs
+az eventhubs eventhub list --namespace-name $EVENTHUBS_NS --resource-group $(terraform output -raw resource_group_name)
+
+# View Event Hub details
+az eventhubs eventhub show \
+  --namespace-name $EVENTHUBS_NS \
+  --name evh-quickbuy-orders-dev \
+  --resource-group $(terraform output -raw resource_group_name)
+```
+
+## 🔄 Update Infrastructure
+
+### Modify Configuration
+```bash
+# Edit variables
+nano terraform.tfvars
+
+# Plan changes
+terraform plan
+
+# Apply changes
+terraform apply
+```
+
+### Add New Resources
+1. Edit `main.tf` or create new modules
+2. Run `terraform plan` to preview
+3. Run `terraform apply` to deploy
+
+## 🗑️ Cleanup / Destroy Resources
+
+### Destroy All Resources
+```bash
+# Destroy everything (CAUTION!)
+terraform destroy
+
+# Destroy specific resources
+terraform destroy -target=module.sql_database
+```
+
+### Selective Cleanup
+```bash
+# Remove just the SQL database to save costs
+terraform apply -var="create_sql_database=false"
+```
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+#### 1. "Subscription not registered"
+```bash
+az provider register --namespace Microsoft.Databricks
+az provider register --namespace Microsoft.EventHub
+az provider register --namespace Microsoft.Storage
+```
+
+#### 2. "Name already exists"
+Storage account names must be globally unique. Edit `terraform.tfvars`:
+```hcl
+# The random suffix will help make it unique
+# Or you can manually adjust the name pattern in modules/storage/main.tf
+```
+
+#### 3. "Insufficient permissions"
+Ensure you have `Contributor` or `Owner` role:
+```bash
+az role assignment list --assignee $(az account show --query user.name -o tsv)
+```
+
+#### 4. "Key Vault access denied"
+Your user needs access policy:
+```bash
+KEY_VAULT=$(terraform output -raw key_vault_name)
+az keyvault set-policy \
+  --name $KEY_VAULT \
+  --upn $(az account show --query user.name -o tsv) \
+  --secret-permissions get list set delete
+```
+
+### Debug Mode
+```bash
+# Enable Terraform debug logging
+export TF_LOG=DEBUG
+terraform plan
+
+# Disable debug logging
+unset TF_LOG
+```
+
+## 📝 Best Practices
+
+### 1. State Management
+```bash
+# For team collaboration, use remote backend
+# Uncomment the backend block in main.tf and create:
+az storage account create --name sttfstatequickbuy --resource-group rg-terraform-state
+az storage container create --name tfstate --account-name sttfstatequickbuy
+```
+
+### 2. Separate Environments
+```bash
+# Use workspaces for multiple environments
+terraform workspace new dev
+terraform workspace new prod
+
+# Switch environments
+terraform workspace select dev
+```
+
+### 3. Variable Management
+```bash
+# Use environment variables for sensitive data
+export TF_VAR_sql_admin_password="YourPassword123!"
+terraform apply
+```
+
+### 4. Version Control
+Add to `.gitignore`:
+```
+*.tfstate
+*.tfstate.backup
+.terraform/
+terraform.tfvars
+*.auto.tfvars
+```
+
+## 🔗 Next Steps
+
+After successful deployment:
+
+1. **Configure Databricks**
+   - Create clusters
+   - Set up Unity Catalog
+   - Import notebooks
+
+2. **Deploy Data Generator**
+   - Configure Event Hubs connection strings
+   - Start generating synthetic data
+
+3. **Create Data Pipeline**
+   - Bronze layer ingestion
+   - Silver layer transformations
+   - Gold layer aggregations
+
+4. **Set Up Monitoring**
+   - Configure alerts
+   - Create dashboards
+   - Enable logging
+
+## 📚 Additional Resources
+
+- [Terraform Azure Provider Docs](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs)
+- [Azure Databricks Documentation](https://docs.microsoft.com/en-us/azure/databricks/)
+- [Azure Event Hubs Documentation](https://docs.microsoft.com/en-us/azure/event-hubs/)
+- [Delta Lake Documentation](https://docs.delta.io/)
+
+## 🤝 Support
+
+For issues or questions:
+1. Check the troubleshooting section
+2. Review Terraform logs
+3. Consult Azure documentation
+4. Open an issue on GitHub
+
+---
+
+**Remember:** Always run `terraform destroy` when you're done to avoid unnecessary costs!# QuickBuy Terraform Deployment Guide
+
+Complete guide to deploy Azure infrastructure for the QuickBuy streaming data pipeline.
+
+## 📋 Prerequisites
+
+### Required Tools
+- **Azure CLI** (version 2.50+)
+  ```bash
+  # Install Azure CLI
+  # macOS
+  brew install azure-cli
+  
+  # Windows
+  # Download from: https://aka.ms/installazurecliwindows
+  
+  # Linux
+  curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+  ```
+
+- **Terraform** (version 1.5+)
+  ```bash
+  # macOS
+  brew tap hashicorp/tap
+  brew install hashicorp/tap/terraform
+  
+  # Windows (using Chocolatey)
+  choco install terraform
+  
+  # Linux
+  wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+  sudo apt install terraform
+  ```
+
+- **Git**
+  ```bash
+  # Verify installation
+  git --version
+  ```
+
+### Azure Account
+- Active Azure subscription
+- Contributor or Owner role
+- Free tier credits work for initial setup
+
+## 📁 Project Structure
+
+```
+quickbuy-streaming-data-pipeline/
+├── azure/
+│   └── terraform/
+│       ├── main.tf                 # Main configuration
+│       ├── variables.tf            # Variable definitions
+│       ├── terraform.tfvars        # Variable values (DO NOT COMMIT)
+│       ├── outputs.tf              # Output definitions
+│       ├── modules/
+│       │   ├── storage/
+│       │   │   ├── main.tf
+│       │   │   └── variables.tf
+│       │   ├── eventhubs/
+│       │   │   ├── main.tf
+│       │   │   └── variables.tf
+│       │   ├── keyvault/
+│       │   │   ├── main.tf
+│       │   │   └── variables.tf
+│       │   ├── databricks/
+│       │   │   ├── main.tf
+│       │   │   └── variables.tf
+│       │   ├── monitoring/
+│       │   │   ├── main.tf
+│       │   │   └── variables.tf
+│       │   └── sql/
+│       │       ├── main.tf
+│       │       └── variables.tf
+│       └── scripts/
+│           └── deploy.sh
+```
+
+## 🚀 Quick Start Deployment
+
+### Step 1: Clone Repository
+```bash
+git clone https://github.com/yourusername/quickbuy-streaming-data-pipeline.git
+cd quickbuy-streaming-data-pipeline/azure/terraform
+```
+
+### Step 2: Login to Azure
+```bash
+az login
+
+# Set your subscription (if you have multiple)
+az account set --subscription "Your Subscription Name"
+
+# Verify
+az account show
+```
+
+### Step 3: Configure Variables
+```bash
+# Copy the example file
+cp terraform.tfvars.example terraform.tfvars
+
+# Edit with your values
+nano terraform.tfvars  # or use your preferred editor
+```
+
+**Important variables to update:**
+```hcl
+project_name    = "quickbuy"
+environment     = "dev"
+github_username = "your-github-username"  # Update this!
+
+# Optional: Enable SQL Database
+create_sql_database = true
+sql_admin_password  = "YourStrongPassword123!"  # Change this!
+```
+
+### Step 4: Initialize Terraform
+```bash
+terraform init
+```
+
+This will:
+- Download required providers
+- Initialize backend
+- Prepare modules
+
+### Step 5: Plan Deployment
+```bash
+terraform plan
+```
+
+Review the plan carefully. You should see approximately **30-40 resources** to be created.
+
+### Step 6: Deploy Infrastructure
+```bash
+# Using the automated script (recommended)
+chmod +x scripts/deploy.sh
+./scripts/deploy.sh
+
+# OR manually
+terraform apply
+```
+
+Enter `yes` when prompted to confirm deployment.
+
+**Deployment time:** Approximately 10-15 minutes
+
+## 📊 What Gets Deployed
+
+### Core Resources
+| Resource | Name Pattern | Purpose |
+|----------|-------------|---------|
+| Resource Group | `rg-quickbuy-dev-cin` | Container for all resources |
+| Storage Account | `stquickbuydevacin` | ADLS Gen2 for data lake |
+| Databricks Workspace | `dbw-quickbuy-dev-cin` | Data processing platform |
+| Event Hubs Namespace | `evhns-quickbuy-dev-cin` | Streaming data ingestion |
+| Key Vault | `kv-quickbuy-dev-xxxx` | Secrets management |
+| Log Analytics | `log-quickbuy-dev-cin` | Monitoring and logging |
+
+### Event Hubs
+- **orders** - Order transaction events (4 partitions)
+- **clickstream** - User behavior events (8 partitions)
+- **products** - Product catalog updates (2 partitions)
+
+### Storage Containers
+- `bronze-layer` - Raw ingested data
+- `silver-layer` - Cleaned and validated data
+- `gold-layer` - Aggregated business metrics
+- `checkpoints` - Streaming checkpoints
+- `configs` - Configuration files
+- `logs` - Application logs
+- `archive` - Historical archives
+- `temp` - Temporary processing
+
+## 🔐 Access Deployed Resources
+
+### Get Deployment Outputs
+```bash
+# View all outputs
+terraform output
+
+# Get specific values
+terraform output storage_account_name
+terraform output databricks_workspace_url
+terraform output eventhubs_namespace_name
+
+# Get sensitive outputs
+terraform output -raw storage_account_key
+```
+
+### Access Databricks
+```bash
+# Get Databricks URL
+DATABRICKS_URL=$(terraform output -raw databricks_workspace_url)
+echo $DATABRICKS_URL
+
+# Open in browser
+open $DATABRICKS_URL  # macOS
+start $DATABRICKS_URL  # Windows
+xdg-open $DATABRICKS_URL  # Linux
+```
+
+### Retrieve Secrets from Key Vault
+```bash
+# Get Key Vault name
+KEY_VAULT=$(terraform output -raw key_vault_name)
+
+# List all secrets
+az keyvault secret list --vault-name $KEY_VAULT
+
+# Get a specific secret
+az keyvault secret show --vault-name $KEY_VAULT --name "eventhub-orders-connection-string" --query value -o tsv
+```
+
+## 💰 Cost Estimation
+
+### Development Environment (Monthly)
+| Service | Configuration | Estimated Cost (INR) |
+|---------|---------------|---------------------|
+| Databricks Compute | 2-4 workers, 8 hours/day | ₹8,000 - ₹12,000 |
+| Storage Account | 100 GB, LRS | ₹500 - ₹800 |
+| Event Hubs | Standard, 1 TU | ₹1,500 - ₹2,500 |
+| Key Vault | Standard | ₹100 - ₹200 |
+| Log Analytics | 5 GB/month | ₹500 - ₹800 |
+| SQL Database (optional) | Basic tier | ₹400 - ₹500 |
+| **Total** | | **₹11,000 - ₹17,000** |
+
+### 💡 Cost Optimization Tips
+1. **Stop Databricks clusters** when not in use
+2. **Use Azure Free Tier** for initial testing
+3. **Enable autoscaling** for Databricks
+4. **Set up cost alerts** in Azure Portal
+5. **Delete resources** after demonstration
+
+## 🧪 Verify Deployment
+
+### Test Storage Account
+```bash
+STORAGE_ACCOUNT=$(terraform output -raw storage_account_name)
+
+# List containers
+az storage container list --account-name $STORAGE_ACCOUNT --auth-mode login
+
+# Upload a test file
+echo "Test file" > test.txt
+az storage blob upload \
+  --account-name $STORAGE_ACCOUNT \
+  --container-name bronze-layer \
+  --name test/test.txt \
+  --file test.txt \
+  --auth-mode login
+```
+
+### Test Event Hubs
+```bash
+EVENTHUBS_NS=$(terraform output -raw eventhubs_namespace_name)
+
+# List Event Hubs
+az eventhubs eventhub list --namespace-name $EVENTHUBS_NS --resource-group $(terraform output -raw resource_group_name)
+
+# View Event Hub details
+az eventhubs eventhub show \
+  --namespace-name $EVENTHUBS_NS \
+  --name evh-quickbuy-orders-dev \
+  --resource-group $(terraform output -raw resource_group_name)
+```
+
+## 🔄 Update Infrastructure
+
+### Modify Configuration
+```bash
+# Edit variables
+nano terraform.tfvars
+
+# Plan changes
+terraform plan
+
+# Apply changes
+terraform apply
+```
+
+### Add New Resources
+1. Edit `main.tf` or create new modules
+2. Run `terraform plan` to preview
+3. Run `terraform apply` to deploy
+
+## 🗑️ Cleanup / Destroy Resources
+
+### Destroy All Resources
+```bash
+# Destroy everything (CAUTION!)
+terraform destroy
+
+# Destroy specific resources
+terraform destroy -target=module.sql_database
+```
+
+### Selective Cleanup
+```bash
+# Remove just the SQL database to save costs
+terraform apply -var="create_sql_database=false"
+```
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+#### 1. "Subscription not registered"
+```bash
+az provider register --namespace Microsoft.Databricks
+az provider register --namespace Microsoft.EventHub
+az provider register --namespace Microsoft.Storage
+```
+
+#### 2. "Name already exists"
+Storage account names must be globally unique. Edit `terraform.tfvars`:
+```hcl
+# The random suffix will help make it unique
+# Or you can manually adjust the name pattern in modules/storage/main.tf
+```
+
+#### 3. "Insufficient permissions"
+Ensure you have `Contributor` or `Owner` role:
+```bash
+az role assignment list --assignee $(az account show --query user.name -o tsv)
+```
+
+#### 4. "Key Vault access denied"
+Your user needs access policy:
+```bash
+KEY_VAULT=$(terraform output -raw key_vault_name)
+az keyvault set-policy \
+  --name $KEY_VAULT \
+  --upn $(az account show --query user.name -o tsv) \
+  --secret-permissions get list set delete
+```
+
+### Debug Mode
+```bash
+# Enable Terraform debug logging
+export TF_LOG=DEBUG
+terraform plan
+
+# Disable debug logging
+unset TF_LOG
+```
+
+## 📝 Best Practices
+
+### 1. State Management
+```bash
+# For team collaboration, use remote backend
+# Uncomment the backend block in main.tf and create:
+az storage account create --name sttfstatequickbuy --resource-group rg-terraform-state
+az storage container create --name tfstate --account-name sttfstatequickbuy
+```
+
+### 2. Separate Environments
+```bash
+# Use workspaces for multiple environments
+terraform workspace new dev
+terraform workspace new prod
+
+# Switch environments
+terraform workspace select dev
+```
+
+### 3. Variable Management
+```bash
+# Use environment variables for sensitive data
+export TF_VAR_sql_admin_password="YourPassword123!"
+terraform apply
+```
+
+### 4. Version Control
+Add to `.gitignore`:
+```
+*.tfstate
+*.tfstate.backup
+.terraform/
+terraform.tfvars
+*.auto.tfvars
+```
+
+## 🔗 Next Steps
+
+After successful deployment:
+
+1. **Configure Databricks**
+   - Create clusters
+   - Set up Unity Catalog
+   - Import notebooks
+
+2. **Deploy Data Generator**
+   - Configure Event Hubs connection strings
+   - Start generating synthetic data
+
+3. **Create Data Pipeline**
+   - Bronze layer ingestion
+   - Silver layer transformations
+   - Gold layer aggregations
+
+4. **Set Up Monitoring**
+   - Configure alerts
+   - Create dashboards
+   - Enable logging
+
+## 📚 Additional Resources
+
+- [Terraform Azure Provider Docs](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs)
+- [Azure Databricks Documentation](https://docs.microsoft.com/en-us/azure/databricks/)
+- [Azure Event Hubs Documentation](https://docs.microsoft.com/en-us/azure/event-hubs/)
+- [Delta Lake Documentation](https://docs.delta.io/)
+
+## 🤝 Support
+
+For issues or questions:
+1. Check the troubleshooting section
+2. Review Terraform logs
+3. Consult Azure documentation
+4. Open an issue on GitHub
+
+---
+
+**Remember:** Always run `terraform destroy` when you're done to avoid unnecessary costs!
